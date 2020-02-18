@@ -70,6 +70,8 @@ class Egybest():
         self.output_dir = "./"
         self.type = self.url.split('/')[3]
         self.output_file = self.output_dir + self.ser_mov_name + ".txt"
+        if os.path.isfile(self.output_file):
+            os.remove(self.output_file)
         print(self.ser_mov_name)
         print("Checking Browsers")
 

@@ -196,6 +196,8 @@ class Egybest():
         self.output_dir = USER_HOME + "\\Desktop\\"
         self.type = self.url.split('/')[3]
         self.output_file = self.output_dir + self.ser_mov_name + ".txt"
+        if os.path.isfile(self.output_file):
+            os.remove(self.output_file)
         self.update_title(self.ser_mov_name)
         self.root.update()
         self.update_status("Checking Browsers")
