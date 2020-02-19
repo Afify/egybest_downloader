@@ -14,12 +14,12 @@ from selenium.webdriver.chrome.options import Options as COptions
 from selenium.webdriver.firefox.options import Options as FOptions
 
 
-def get_request(url, html_tag, class_name):
+def get_request(url):
     """ send get request return all """
     req = requests.get(url)
     soup = BeautifulSoup(req.text, "html.parser")
     if req.status_code == 200:
-        result = soup.find_all(html_tag, class_=class_name)
+        result = soup.find_all("div", class_="movies_small")[0]
     else:
         print("check connection")
         sys.exit()
@@ -38,11 +38,17 @@ def check_inserted_link(url):
         print("no internet or invalid link")
         sys.exit()
 
+def get_season_eps(season_url):
+    """ get season url page, return each_ep url """
+    req = get_request(season_url)
+    eps_list = req.find_all("a")
+    return eps_list
 
 class Egybest():
     """ open url of a movie get download link """
-    def __init__(self, url):
+    def __init__(self, url, selected_season=False):
         self.url = url
+        self.selected_season = selected_season
         self.firefox_driver_path = ""
         self.chrome_driver_path = ""
         self.ser_mov_name = ""
@@ -63,13 +69,19 @@ class Egybest():
             self.get_links(self.url)
 
     def get_url_data(self):
+        """ configure inputted url """
         self.url = self.url.rsplit('?', 1)[0]
         if self.url[-1] == "/":
             self.url = self.url[:-1]
         self.ser_mov_name = self.url.rsplit('/', 1)[-1]
         self.output_dir = "./"
         self.type = self.url.split('/')[3]
-        self.output_file = self.output_dir + self.ser_mov_name + ".txt"
+        if self.selected_season:
+            self.output_file = (
+                self.output_dir + self.ser_mov_name +
+                "_" + self.selected_season + ".txt")
+        else:
+            self.output_file = self.output_dir + self.ser_mov_name + ".txt"
         if os.path.isfile(self.output_file):
             os.remove(self.output_file)
         print(self.ser_mov_name)
@@ -93,12 +105,6 @@ class Egybest():
                 print("try Chrome")
                 conf_options = COptions()
                 conf_options.add_argument("--headless")
-#                 self.conf_options.add_argument('--disable-extensions')
-#                 self.conf_options.add_argument('--disable-logging')
-#                 self.conf_options.add_argument('--disable-gpu')
-#                 self.conf_options.add_argument('--hide-scrollbars')
-#                 self.conf_options.add_argument("--log-level=3")  # fatal
-
                 self.driver = webdriver.Chrome(
                     options=conf_options)
 
@@ -108,28 +114,29 @@ class Egybest():
                 sys.exit()
 
 
-    def get_season_eps(self, season_url):
-        """ get season url page, return each_ep url """
-        req = get_request(season_url, "div", "movies_small")[0]
-        eps_list = req.find_all("a")
-        return eps_list
-
-
     def get_series_urls(self, url):
         """ if url is series, use BeautifulSoup get sum of seasons
         for each season get it's episodes,
         for each episode send to get_links() """
-        res = get_request(url, "div", "movies_small")[0]
-        seasons_list = res.find_all("a")
+        req = get_request(url)
+        seasons_list = req.find_all("a")
         number_of_seasons = len(seasons_list)
         season_eps = []
         all_eps = []
 
         for each_season_page in seasons_list:
-            season_eps.append(self.get_season_eps(each_season_page['href']))
+            season_eps.append(get_season_eps(each_season_page['href']))
 
-        for each_season in season_eps:
-            for each_ep in each_season:
+
+        season_eps = season_eps[::-1] # reverse order
+
+        if not self.selected_season:
+            for each_season in season_eps:
+                for each_ep in each_season:
+                    all_eps.append(each_ep['href'])
+
+        if self.selected_season:
+            for each_ep in season_eps[int(self.selected_season)-1]:
                 all_eps.append(each_ep['href'])
 
         all_eps = all_eps[::-1] # reverse order
@@ -225,7 +232,7 @@ class Egybest():
         elif self.type == "series":
             self.series_done += 1
             print(
-                self.ser_mov_name +
+                self.ser_mov_name + " " +
                 str(self.series_done) + " / " +
                 str(self.series_sum_eps))
             if self.series_done == self.series_sum_eps:
@@ -258,7 +265,11 @@ class Egybest():
 
 if __name__ == "__main__":
     try:
-        Egybest(url=sys.argv[1])
+        try:
+            Egybest(url=sys.argv[1], selected_season=sys.argv[2])
+
+        except IndexError:
+            Egybest(url=sys.argv[1])
 
     except KeyboardInterrupt:
         print("\n\033[31mError, Keyboard Interrupted\033[00m\n")
