@@ -13,7 +13,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options as COptions
 from selenium.webdriver.firefox.options import Options as FOptions
 
-
 def get_request(url):
     """ send get request return all """
     req = requests.get(url)
@@ -59,6 +58,10 @@ class Egybest():
         self.output_file = self.output_dir + self.ser_mov_name + ".txt"
         self.driver = ""
 
+        # options
+        use_extentions = 0
+        use_driver_profile = 0
+
         check_inserted_link(self.url)
         self.get_url_data()
         self.start_browser()
@@ -67,6 +70,8 @@ class Egybest():
             self.get_series_urls(self.url)
         else:
             self.get_links(self.url)
+
+        self.clean()
 
     def get_url_data(self):
         """ configure inputted url """
@@ -86,6 +91,22 @@ class Egybest():
             os.remove(self.output_file)
         print(self.ser_mov_name)
         print("Checking Browsers")
+        self.url = self.url + "/?ref=home-trends"
+
+    def use_extentions(self):
+            extension_dir = "/home/hassan/.mozilla/firefox/9t20uyuu.default-default/extensions/"
+            extensions = [ 'https-everywhere@eff.org.xpi',
+                            'CookieAutoDelete@kennydo.com.xpi',
+                            'firefox@ghostery.com.xpi',
+                            'uBlock0@raymondhill.net.xpi']
+            for extension in extensions:
+                    self.driver.install_addon(extension_dir + extension,
+                            temporary=True)
+
+    def use_driver_profile(self):
+            profile = webdriver.FirefoxProfile()
+            profile.set_preference("dom.webdriver.enabled", False)
+            profile.set_preference('useAutomationExtension', False)
 
     def start_browser(self):
         """ start Browsers """
@@ -94,9 +115,19 @@ class Egybest():
             print("try Firefox")
             conf_options = FOptions()
             conf_options.add_argument("--headless")
+#             conf_options.add_argument("--disable-blink-features=AutomationControlled")
+#             conf_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64; rv:76.0) Gecko/20100101 Firefox/76.0")
+
+            if use_driver_profile  == 1:
+                self.start_driver_profile()
+
             self.driver = webdriver.Firefox(
+#                 firefox_profile=profile,
                 options=conf_options,
                 service_log_path=os.path.devnull)
+
+            if use_extentions == 1:
+                self.start_extentions()
 
         except WebDriverException:
             print("Firefox not installed")
@@ -126,9 +157,7 @@ class Egybest():
 
         for each_season_page in seasons_list:
             season_eps.append(get_season_eps(each_season_page['href']))
-
-
-        season_eps = season_eps[::-1] # reverse order
+#         season_eps = season_eps[::-1] # reverse order
 
         if not self.selected_season:
             for each_season in season_eps:
@@ -161,7 +190,6 @@ class Egybest():
         """ open headless firefox driver, open movie or episode page
         click download button go to vidstream page click download open file
         append download link """
-#         get(85%)
 
         self.gototab(0)
         try:
@@ -177,10 +205,16 @@ class Egybest():
         down_xpath = "/html/body/div[4]/div[2]/div[3]/div[7]/table/tbody/tr[1]/td[4]/a[1]"
         vid_css_sel = "a.bigbutton:nth-child(1)"
         vid_xpath = "/html/body/div[1]/div/p[2]/a[1]"
+        egybest_xpath = "/html/body/div[3]/div/div[1]/a"
 
         # 1- open page
         self.gototab(0)
         print("try opening link")
+        self.driver.get(url)
+        print("link opened")
+        self.get_xpath(egybest_xpath).click()
+        self.driver.get("https://egy.best")
+        print("home opened")
         self.driver.get(url)
         print("link opened")
 
@@ -224,12 +258,8 @@ class Egybest():
         ofile.close()
         print("written")
 
-        if self.type == "movie":
-            sys.exit()
-            self.driver.quit()
-
         # check type series count
-        elif self.type == "series":
+        if self.type == "series":
             self.series_done += 1
             print(
                 self.ser_mov_name + " " +
@@ -237,8 +267,6 @@ class Egybest():
                 str(self.series_sum_eps))
             if self.series_done == self.series_sum_eps:
                 print("All series episodes are finished")
-                sys.exit()
-                self.driver.quit()
 
     def get_xpath(self, the_xpath, seconds=15):
         """ return element from passed xpath """
@@ -262,6 +290,10 @@ class Egybest():
         """ check download button class  if bigbutton == link is ready """
         return self.get_css_sel(the_css_sel).get_attribute("class")
 
+    def clean(self):
+        self.driver.quit()
+        print("exit")
+        sys.exit()
 
 if __name__ == "__main__":
     try:
